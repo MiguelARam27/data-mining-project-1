@@ -5,11 +5,7 @@
 \usepackage{booktabs}   
 \usepackage{url}      
 
-<<<<<<< HEAD
-\title{Predicting Critical Temperature Of Superconducting Materials: LASSO vs Ridge Regression}
-=======
 \title{Predicting Superconducting Critical Temperature Using Regression Analysis}
->>>>>>> c4c3268436f4b34b5235d239153896005e0cad7b
 
 \author{
   \IEEEauthorblockN{Miguel Ramirez}
@@ -25,7 +21,6 @@
 \maketitle
 
 \begin{abstract}
-<<<<<<< HEAD
 This project uses a LASSO and Ridge regression model to predict the superconducting critical temperature ($T_c$). 
 The dataset is provided by the UCI Machine Learning Repository and contains 21,263 superconductors with 81 predictor variables. 
 Both models are evaluated using cross-validation, with performance measured by Root Mean Square Error (RMSE), Mean Absolute Error (MAE), and $R^2$.
@@ -44,26 +39,6 @@ Each entry represents a superconductor with various measurements and statistics 
 The target variable is the critical temperature ($T_c$) at which the material becomes superconducting. 
 The task is to build models that can predict $T_c$ from the given features. 
 Because the dataset is high-dimensional and many of the predictors are correlated, ordinary least squares regression is not ideal. Instead, we apply two regularized regression methods:
-=======
-This project develops a regression model to predict the superconducting critical temperature 
-based on features extracted from the chemical formula. We evaluate linear regression models, 
-apply stepwise feature selection, and compare predictive performance.
-\end{abstract}
-
-\begin{IEEEkeywords}
-Superconductor, regression, machine learning, UCI dataset
-\end{IEEEkeywords}
-
-\section{Introduction}
-A superconductor is a material that allows electricity to flow without resistance. 
-The temperature at which this occurs is called the critical temperature ($T_c$).
-Predicting $T_c$ from a compound’s chemical composition is a long-standing challenge in materials science.
-
-\section{Data}
-We used the Superconductivity Data Set from the UCI Machine Learning Repository 
-(\url{https://archive.ics.uci.edu/dataset/464/superconductivty+data}), 
-which contains 21,263 superconductors, 81 predictor variables, and one target variable ($T_c$).
->>>>>>> c4c3268436f4b34b5235d239153896005e0cad7b
 
 \section{Methodology}
 We fit a linear regression model:
@@ -92,7 +67,6 @@ Table~\ref{tab:results} shows performance metrics for the final regression model
   \label{tab:results}
 \end{table}
 
-<<<<<<< HEAD
 lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 \section{Conclusion}
 lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
@@ -112,16 +86,3 @@ D. Dua and C. Graff, ``UCI Machine Learning Repository: Superconductivity Data S
 \end{document}
 
 
-=======
-\section{Conclusion}
-The regression model explained about 78\% of the variation in $T_c$. 
-Key predictors included atomic mass, valence, and thermal conductivity.
-
-\begin{thebibliography}{00}
-\bibitem{hamidieh2018}
-K. Hamidieh, ``A data-driven statistical model for predicting the critical temperature of a superconductor,'' 
-\emph{Computational Materials Science}, vol. 154, pp. 346--354, 2018.
-\end{thebibliography}
-
-\end{document}
->>>>>>> c4c3268436f4b34b5235d239153896005e0cad7b
