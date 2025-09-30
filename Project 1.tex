@@ -1,0 +1,88 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{graphicx}   
+\usepackage{amsmath}    
+\usepackage{booktabs}   
+\usepackage{url}      
+
+\title{Predicting Critical Temperature Of Superconducting Materials: LASSO vs Ridge Regression}
+
+\author{
+  \IEEEauthorblockN{Miguel Ramirez}
+  \IEEEauthorblockA{
+    Department of Statistics and Data Science \\
+    University of Central Florida \\
+    Orlando, United States \\
+    miramirez@knights.ucf.edu}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This project uses a LASSO and Ridge regression model to predict the superconducting critical temperature ($T_c$). 
+The dataset is provided by the UCI Machine Learning Repository and contains 21,263 superconductors with 81 predictor variables. 
+Both models are evaluated using cross-validation, with performance measured by Root Mean Square Error (RMSE), Mean Absolute Error (MAE), and $R^2$.
+\end{abstract}
+\begin{IEEEkeywords}
+Superconductor Critical Temperature, UCI Dataset, LASSO Regression, Ridge Regression
+\end{IEEEkeywords}
+
+\section*{Introduction}
+
+The critical temperature ($T_c$) of a superconducting material is the specific temperature below which it exhibits zero electrical resistance and transitions from a normal conducting state to a superconducting state \cite{sciencedirect_tc}.
+
+\section{Data}
+The Superconductivity Data Set from the UCI Machine Learning Repository provides information on 21,263 superconductors with 81 predictor variables and no missing values. 
+Each entry represents a superconductor with various measurements and statistics of said superconductor. These include \emph{number\_of\_elements}, \emph{mean\_atomic\_mass}, \emph{mean\_field\_strength} and other various measurements/statistics. 
+The target variable is the critical temperature ($T_c$) at which the material becomes superconducting. 
+The task is to build models that can predict $T_c$ from the given features. 
+Because the dataset is high-dimensional and many of the predictors are correlated, ordinary least squares regression is not ideal. Instead, we apply two regularized regression methods:
+
+\section{Methodology}
+We fit a linear regression model:
+\begin{equation}
+Y = \beta_0 + \beta_1X_1 + \cdots + \beta_pX_p + \epsilon
+\end{equation}
+where $Y$ is the transformed $T_c$ and $X_i$ are the predictor variables.
+
+\subsection{Model Selection}
+We applied stepwise regression using BIC to reduce the number of predictors.
+
+\section{Results}
+Table~\ref{tab:results} shows performance metrics for the final regression model.
+
+\begin{table}[htbp]
+  \caption{Model Performance}
+  \centering
+  \begin{tabular}{lcc}
+    \toprule
+    Metric & Train & Test \\
+    \midrule
+    $R^2$       & 0.78 & 0.77 \\
+    MSE         & 2.51 & 2.56 \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:results}
+\end{table}
+
+lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+\section{Conclusion}
+lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+\begin{thebibliography}{00}
+
+\bibitem{sciencedirect_tc}
+Superconducting Critical Temperature \emph{ScienceDirect Topics}, Elsevier. [Online]. 
+Available: https://www.sciencedirect.com/topics/chemistry/superconducting-critical-temperature. 
+
+\bibitem{uci_dataset}
+D. Dua and C. Graff, ``UCI Machine Learning Repository: Superconductivity Data Set,'' 
+\emph{University of California, Irvine, School of Information and Computer Sciences}, 2018. 
+[Online]. Available: https://archive.ics.uci.edu/dataset/464/superconductivty+data. 
+[Accessed: Sept. 25, 2025].
+
+\end{thebibliography}
+\end{document}
+
+
