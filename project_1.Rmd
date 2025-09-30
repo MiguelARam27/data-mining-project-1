@@ -1,0 +1,209 @@
+---
+title: "Predicting Superconducting Critical Temperature with Linear Regression"
+author: "Miguel Ramirez"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# 1. Libraries
+```{r}
+library(tidyverse)   # dplyr::select will be explicitly qualified below
+library(caret)
+library(GGally)
+library(corrplot)
+library(MASS)        # stepAIC (MASS::select can mask dplyr::select)
+library(car)
+library(broom)
+library(gridExtra)
+# Prefer dplyr's select if the conflicted package is available
+if (requireNamespace("conflicted", quietly = TRUE)) {
+  conflicted::conflict_prefer("select", "dplyr", quiet = TRUE)
+}
+set.seed(123)
+```
+
+# 2. Data Loading
+```{r}
+train <- readr::read_csv("train.csv")
+unique_m <- readr::read_csv("unique_m.csv")
+
+glimpse(train)
+summary(train$critical_temp)
+```
+
+# 3. Exploratory Data Analysis
+
+## 3.1 Target Distribution
+```{r}
+p1 <- ggplot(train, aes(x = critical_temp)) +
+  geom_histogram(bins = 60, fill = "steelblue") +
+  labs(title = "Histogram of Critical Temperature")
+p2 <- ggplot(train, aes(y = critical_temp)) +
+  geom_boxplot(fill = "tomato") +
+  labs(title = "Boxplot of Critical Temperature")
+grid.arrange(p1, p2, ncol = 2)
+```
+
+Q-Q Plot:
+```{r}
+qq_df <- data.frame(
+  theor = qqnorm(train$critical_temp, plot.it = FALSE)$x,
+  sample = sort(train$critical_temp)
+)
+ggplot(qq_df, aes(theor, sample)) +
+  geom_point(alpha = 0.4) +
+  geom_abline(linetype = 2) +
+  labs(title = "Q-Q Plot of Critical Temp")
+```
+
+## 3.2 Correlation with Target
+```{r}
+X <- train %>% dplyr::select(-critical_temp)
+y <- train$critical_temp
+
+cors <- purrr::map_dbl(names(X), ~ suppressWarnings(cor(X[[.x]], y)))
+cors_tbl <- tibble(feature = names(X), cor = cors) %>%
+  mutate(abs_cor = abs(cor)) %>%
+  arrange(desc(abs_cor))
+
+head(cors_tbl, 15)
+```
+
+Barplot of top features:
+```{r}
+cors_tbl %>%
+  slice_max(abs_cor, n = 25) %>%
+  mutate(feature = forcats::fct_reorder(feature, abs_cor)) %>%
+  ggplot(aes(feature, abs_cor)) +
+  geom_col(fill = "darkgreen") +
+  coord_flip() +
+  labs(title = "Top 25 Predictors by |Correlation| with Critical Temp",
+       x = NULL, y = "|correlation|")
+```
+
+Heatmap of top correlated features:
+```{r}
+top_feats <- cors_tbl %>% slice_max(abs_cor, n = 20) %>% pull(feature)
+corrplot::corrplot(cor(train %>% dplyr::select(dplyr::all_of(top_feats), critical_temp),
+                       use = "pairwise.complete.obs"),
+         type = "upper", order = "hclust")
+```
+
+# 4. Train/Validation Split
+```{r}
+idx <- caret::createDataPartition(train$critical_temp, p = 0.8, list = FALSE)
+training <- train[idx, ]
+testing  <- train[-idx, ]
+```
+
+# 5. Pre-Filtering
+
+## 5.1 Remove Near-Zero Variance
+```{r}
+nzv <- caret::nearZeroVar(training %>% dplyr::select(-critical_temp), saveMetrics = TRUE)
+nzv_drop <- rownames(nzv)[nzv$nzv]
+length(nzv_drop)
+```
+
+## 5.2 Remove Highly Correlated Predictors
+```{r}
+X_train <- training %>% dplyr::select(-critical_temp, -dplyr::all_of(nzv_drop))
+cm <- cor(X_train, use = "pairwise.complete.obs")
+high_corr <- caret::findCorrelation(cm, cutoff = 0.95, names = TRUE, exact = TRUE)
+length(high_corr)
+```
+
+Reduced dataset:
+```{r}
+train_red <- dplyr::bind_cols(X_train %>% dplyr::select(-dplyr::all_of(high_corr)),
+                       critical_temp = training$critical_temp)
+```
+
+# 6. Model Building
+
+## 6.1 Stepwise Selection with BIC
+```{r}
+full_fit <- lm(critical_temp ~ ., data = train_red)
+bic_step <- MASS::stepAIC(full_fit, direction = "both", k = log(nrow(train_red)), trace = FALSE)
+summary(bic_step)
+```
+
+Chosen terms:
+```{r}
+chosen_terms <- names(coef(bic_step))[-1]
+length(chosen_terms)
+head(chosen_terms, 20)
+```
+
+## 6.2 VIF Pruning
+```{r}
+vif_prune <- function(fit, threshold = 10) {
+  repeat {
+    v <- car::vif(fit)
+    if (is.matrix(v)) v <- diag(v)
+    if (length(v) == 0) break
+    v <- sort(v, decreasing = TRUE)
+    if (v[1] > threshold) {
+      worst <- names(v)[1]
+      message("Dropping ", worst, " with VIF=", round(v[1],2))
+      terms_now <- attr(terms(fit), "term.labels")
+      terms_new <- setdiff(terms_now, worst)
+      new_form  <- as.formula(paste("critical_temp ~", paste(terms_new, collapse = " + ")))
+      fit <- lm(new_form, data = model.frame(fit))
+    } else break
+  }
+  fit
+}
+
+final_fit <- vif_prune(bic_step, threshold = 10)
+summary(final_fit)
+```
+
+Final predictors:
+```{r}
+final_terms <- names(coef(final_fit))[-1]
+final_terms
+```
+
+# 7. Diagnostics
+```{r}
+par(mfrow = c(2,2))
+plot(final_fit)
+par(mfrow = c(1,1))
+```
+
+Residual plots:
+```{r}
+broom::augment(final_fit) %>%
+  ggplot(aes(.fitted, .resid)) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  labs(title = "Residuals vs Fitted")
+```
+
+# 8. Performance
+```{r}
+pred_train <- predict(final_fit, newdata = training)
+pred_test  <- predict(final_fit, newdata = testing)
+
+train_metrics <- caret::postResample(pred_train, training$critical_temp)
+test_metrics  <- caret::postResample(pred_test,  testing$critical_temp)
+
+tibble(
+  Split = c("Train","Test"),
+  RMSE  = c(train_metrics["RMSE"], test_metrics["RMSE"]),
+  Rsq   = c(train_metrics["Rsquared"], test_metrics["Rsquared"]),
+  MAE   = c(mean(abs(training$critical_temp - pred_train)),
+            mean(abs(testing$critical_temp  - pred_test)))
+)
+```
+
+# 9. Conclusion
+- Predictors retained: see `final_terms`.  
+- These are the variables you should use in your linear regression.  
+- Diagnostics show whether assumptions are satisfied.  
+- Performance metrics compare training and test sets.  

@@ -1,0 +1,80 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{graphicx}   
+\usepackage{amsmath}    
+\usepackage{booktabs}   
+\usepackage{url}      
+
+\title{Predicting Superconducting Critical Temperature Using Regression Analysis}
+
+\author{
+  \IEEEauthorblockN{Miguel Ramirez}
+  \IEEEauthorblockA{
+    Department of Statistics and Data Science \\
+    University of Central Florida \\
+    Orlando, United States \\
+    miramirez@knights.ucf.edu}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This project develops a regression model to predict the superconducting critical temperature 
+based on features extracted from the chemical formula. We evaluate linear regression models, 
+apply stepwise feature selection, and compare predictive performance.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Superconductor, regression, machine learning, UCI dataset
+\end{IEEEkeywords}
+
+\section{Introduction}
+A superconductor is a material that allows electricity to flow without resistance. 
+The temperature at which this occurs is called the critical temperature ($T_c$).
+Predicting $T_c$ from a compound’s chemical composition is a long-standing challenge in materials science.
+
+\section{Data}
+We used the Superconductivity Data Set from the UCI Machine Learning Repository 
+(\url{https://archive.ics.uci.edu/dataset/464/superconductivty+data}), 
+which contains 21,263 superconductors, 81 predictor variables, and one target variable ($T_c$).
+
+\section{Methodology}
+We fit a linear regression model:
+\begin{equation}
+Y = \beta_0 + \beta_1X_1 + \cdots + \beta_pX_p + \epsilon
+\end{equation}
+where $Y$ is the transformed $T_c$ and $X_i$ are the predictor variables.
+
+\subsection{Model Selection}
+We applied stepwise regression using BIC to reduce the number of predictors.
+
+\section{Results}
+Table~\ref{tab:results} shows performance metrics for the final regression model.
+
+\begin{table}[htbp]
+  \caption{Model Performance}
+  \centering
+  \begin{tabular}{lcc}
+    \toprule
+    Metric & Train & Test \\
+    \midrule
+    $R^2$       & 0.78 & 0.77 \\
+    MSE         & 2.51 & 2.56 \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:results}
+\end{table}
+
+\section{Conclusion}
+The regression model explained about 78\% of the variation in $T_c$. 
+Key predictors included atomic mass, valence, and thermal conductivity.
+
+\begin{thebibliography}{00}
+\bibitem{hamidieh2018}
+K. Hamidieh, ``A data-driven statistical model for predicting the critical temperature of a superconductor,'' 
+\emph{Computational Materials Science}, vol. 154, pp. 346--354, 2018.
+\end{thebibliography}
+
+\end{document}
