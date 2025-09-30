@@ -5,7 +5,7 @@
 \usepackage{booktabs}   
 \usepackage{url}      
 
-\title{Predicting Superconducting Critical Temperature Using Regression Analysis}
+\title{Predicting Critical Temperature of Superconductors: Lasso vs Ridge Regression}
 
 \author{
   \IEEEauthorblockN{Miguel Ramirez}
@@ -41,11 +41,28 @@ The task is to build models that can predict $T_c$ from the given features.
 Because the dataset is high-dimensional and many of the predictors are correlated, ordinary least squares regression is not ideal. Instead, we apply two regularized regression methods:
 
 \section{Methodology}
-We fit a linear regression model:
-\begin{equation}
+\noindent In general a regression model can be expressed as:
+\[
 Y = \beta_0 + \beta_1X_1 + \cdots + \beta_pX_p + \epsilon
-\end{equation}
-where $Y$ is the transformed $T_c$ and $X_i$ are the predictor variables.
+\]
+where $Y$ is the critical Temperature $T_c$ and $X_i$ are the predictor variables.
+
+Due to the amount of possible features (81), we employ regularized regression methods to prevent overfitting and handle multicollinearity.
+
+\subsection{Ridge Regression}
+Ridge regression adds an L2 penalty term to the ordinary least squares objective function:
+\[
+\hat{\beta}^{\text{Ridge}} = \arg\min_{\beta} \left\{ \sum_{i=1}^{n} (y_i - \beta_0 - \sum_{j=1}^{p} \beta_j x_{ij})^2 + \lambda \sum_{j=1}^{p} \beta_j^2 \right\}
+\]
+where $\lambda \geq 0$ is the regularization parameter that controls the strength of the penalty.
+
+\subsection{LASSO Regression}
+LASSO (Least Absolute Shrinkage and Selection Operator) uses an L1 penalty:
+\[
+\hat{\beta}^{\text{LASSO}} = \arg\min_{\beta} \left\{ \sum_{i=1}^{n} (y_i - \beta_0 - \sum_{j=1}^{p} \beta_j x_{ij})^2 + \lambda \sum_{j=1}^{p} |\beta_j| \right\}
+\]
+
+The L1 penalty promotes sparsity by setting some coefficients exactly to zero, effectively performing feature selection.
 
 \subsection{Model Selection}
 We applied stepwise regression using BIC to reduce the number of predictors.
