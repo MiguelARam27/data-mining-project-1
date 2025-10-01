@@ -32,13 +32,68 @@ Superconductor Critical Temperature, UCI Dataset, LASSO Regression, Ridge Regres
 \section*{Introduction}
 
 The critical temperature ($T_c$) of a superconducting material is the specific temperature below which it exhibits zero electrical resistance and transitions from a normal conducting state to a superconducting state \cite{sciencedirect_tc}.
+According to the U.S. Department of Energy, superconductivity is important because it enables electricity to flow without energy loss and allows materials to repel magnetic fields \cite{doe_superconductivity}.
+These properties are the foundation for technologies such as MRI machines, particle accelerators, and quantum computers. 
+Furthermore, advances in high-temperature superconductors could have transformative applications in energy-efficient power transmission.
 
 \section{Data}
 The Superconductivity Data Set from the UCI Machine Learning Repository provides information on 21,263 superconductors with 81 predictor variables and no missing values. 
 Each entry represents a superconductor with various measurements and statistics of said superconductor. These include \emph{number\_of\_elements}, \emph{mean\_atomic\_mass}, \emph{mean\_field\_strength} and other various measurements/statistics. 
-The target variable is the critical temperature ($T_c$) at which the material becomes superconducting. 
-The task is to build models that can predict $T_c$ from the given features. 
-Because the dataset is high-dimensional and many of the predictors are correlated, ordinary least squares regression is not ideal. Instead, we apply two regularized regression methods:
+The target variable is the critical temperature ($T_c$) at which the superconductor becomes superconducting[2]. 
+
+\section {Data analysis}
+
+Table~\ref{tab:summary} provides the five-number summary and the standard deviation 
+of the critical temperature ($T_c$). As there are 81 predictors in this data set, I could not show a correlation plot to display the multicollinearity.
+So I decided to show the top 10 most correlated pairs in Table~\ref{tab:top_corr}.
+Figure~\ref{fig:tc_distribution} illustrates the distribution of Critical Temperature ($T_c$). The values indicate that the distribution is 
+right-skewed. The five number summary confirms this as well.
+
+So ordinary OLS regression is not suitable for this dataset due to the risk of overfitting.
+Additionally, the 81 predictor variables create a high-dimensional setting as shown in Table~\ref{tab:top_corr}.
+
+\begin{table}[h]
+\centering
+\caption{Five-Number Summary and Standard Deviation of Critical Temperature $T_c$ }
+\label{tab:summary}
+\begin{tabular}{ccccccc}
+\toprule
+Min & 1st Qu. & Median & Mean & 3rd Qu. & Max & Std \\\\
+\midrule
+0.0002 & 5.365 & 20 & 34.42 & 63 & 185 & 34.25 \\\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Top 10 Most Correlated Predictor Pairs ($|r|$)}
+\label{tab:top_corr}
+\begin{tabular}{l l c}
+\toprule
+Variable 1 & Variable 2 & $|r|$ \\
+\midrule
+pred\_lasso & pred\_ridge & 1.000 \\
+resid\_lasso & resid\_ridge & 0.999 \\
+entropy\_fie & entropy\_atomic\_radius & 0.998 \\
+wtd\_mean\_Valence & wtd\_gmean\_Valence & 0.995 \\
+entropy\_fie & entropy\_Valence & 0.993 \\
+wtd\_mean\_fie & wtd\_gmean\_fie & 0.992 \\
+mean\_Valence & gmean\_Valence & 0.990 \\
+entropy\_atomic\_radius & entropy\_Valence & 0.990 \\
+range\_ThermalConductivity & std\_ThermalConductivity & 0.988 \\
+range\_FusionHeat & std\_FusionHeat & 0.985 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\linewidth]{temp_distr.png}
+    \caption{Distribution of ritical temperature ($T_c$)}
+    \label{fig:tc_distribution}
+\end{figure}
 
 \section{Methodology}
 \noindent In general a regression model can be expressed as:
@@ -47,42 +102,42 @@ Y = \beta_0 + \beta_1X_1 + \cdots + \beta_pX_p + \epsilon
 \]
 where $Y$ is the critical Temperature $T_c$ and $X_i$ are the predictor variables.
 
-Due to the amount of possible features (81), we employ regularized regression methods to prevent overfitting and handle multicollinearity.
-
+Due to the amount of possible features (81), I'll employ two types of regression models that can help with feature selection.
 \subsection{Ridge Regression}
-Ridge regression adds an L2 penalty term to the ordinary least squares objective function:
+Ridge regression is a regularized form of linear regression that adds an $L_2$ penalty (squared coefficients) to the ordinary least squares objective function:
+
 \[
-\hat{\beta}^{\text{Ridge}} = \arg\min_{\beta} \left\{ \sum_{i=1}^{n} (y_i - \beta_0 - \sum_{j=1}^{p} \beta_j x_{ij})^2 + \lambda \sum_{j=1}^{p} \beta_j^2 \right\}
+\min_{\beta} \left\{ \sum_{i=1}^{n} \left(y_i - \beta_0 - \sum_{j=1}^{p} \beta_j x_{ij}\right)^2 
++ \lambda \sum_{j=1}^{p} \beta_j^2 \right\}.
 \]
-where $\lambda \geq 0$ is the regularization parameter that controls the strength of the penalty.
+
+where:
+\begin{itemize}
+    \item $y_i$ = observed response for sample $i$,
+    \item $x_{ij}$ = value of predictor $j$ for sample $i$,
+    \item $\beta_j$ = coefficient for predictor $j$,
+    \item $p$ = number of predictors ,
+    \item $\lambda \geq 0$ = regularization parameter controlling penalty strength.
+\end{itemize}
+
+The $L_2$ penalty shrinks coefficients toward zero but does not set them exactly to zero. Which helps mitigate multicollinearity and overfitting.
+
 
 \subsection{LASSO Regression}
-LASSO (Least Absolute Shrinkage and Selection Operator) uses an L1 penalty:
+LASSO (Least Absolute Shrinkage and Selection Operator) introduces an $L_1$ penalty (absolute value of coefficients) instead:
+
 \[
-\hat{\beta}^{\text{LASSO}} = \arg\min_{\beta} \left\{ \sum_{i=1}^{n} (y_i - \beta_0 - \sum_{j=1}^{p} \beta_j x_{ij})^2 + \lambda \sum_{j=1}^{p} |\beta_j| \right\}
+\min_{\beta} \left\{ \sum_{i=1}^{n} \left(y_i - \beta_0 - \sum_{j=1}^{p} \beta_j x_{ij}\right)^2 
++ \lambda \sum_{j=1}^{p} |\beta_j| \right\}.
 \]
 
-The L1 penalty promotes sparsity by setting some coefficients exactly to zero, effectively performing feature selection.
+where the terms are defined as above.
+
+The $L_1$ penalty not only shrinks coefficients but can also set some of them exactly to zero. This allows LASSO to perform variable selection automatically, keeping only the most relevant predictors in the model.
+
 
 \subsection{Model Selection}
 We applied stepwise regression using BIC to reduce the number of predictors.
-
-\section{Results}
-Table~\ref{tab:results} shows performance metrics for the final regression model.
-
-\begin{table}[htbp]
-  \caption{Model Performance}
-  \centering
-  \begin{tabular}{lcc}
-    \toprule
-    Metric & Train & Test \\
-    \midrule
-    $R^2$       & 0.78 & 0.77 \\
-    MSE         & 2.51 & 2.56 \\
-    \bottomrule
-  \end{tabular}
-  \label{tab:results}
-\end{table}
 
 lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 \section{Conclusion}
@@ -98,6 +153,11 @@ D. Dua and C. Graff, ``UCI Machine Learning Repository: Superconductivity Data S
 \emph{University of California, Irvine, School of Information and Computer Sciences}, 2018. 
 [Online]. Available: https://archive.ics.uci.edu/dataset/464/superconductivty+data. 
 [Accessed: Sept. 25, 2025].
+
+\bibitem{doe_superconductivity}
+U.S. Department of Energy, ``DOE Explains... Superconductivity,'' 
+\emph{Office of Science}, 2021. [Online]. 
+Available: https://www.energy.gov/science/doe-explainssuperconductivity.
 
 \end{thebibliography}
 \end{document}
