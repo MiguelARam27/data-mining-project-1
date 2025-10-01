@@ -16,4 +16,10 @@
 *.snm
 *.pdf
 *.csv
-
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.svg

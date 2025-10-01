@@ -1,7 +1,7 @@
 ---
 title: "Predicting Superconducting Critical Temperature with Linear Regression"
 author: "Miguel Ramirez"
-date: "`r format(Sys.time(), '%Y-%m-%d')`"
+date: "September 26, 2025"
 output: html_document
 ---
 
@@ -9,201 +9,236 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
-# 1. Libraries
+
 ```{r}
-library(tidyverse)   # dplyr::select will be explicitly qualified below
-library(caret)
-library(GGally)
+library(glmnet)
+library(readr)
+library(dplyr)
+library(ggplot2)
 library(corrplot)
-library(MASS)        # stepAIC (MASS::select can mask dplyr::select)
-library(car)
-library(broom)
-library(gridExtra)
-# Prefer dplyr's select if the conflicted package is available
-if (requireNamespace("conflicted", quietly = TRUE)) {
-  conflicted::conflict_prefer("select", "dplyr", quiet = TRUE)
-}
+library(caret)
+library(Metrics)
+library(tidyverse)
+
 set.seed(123)
 ```
 
-# 2. Data Loading
+# Data 
 ```{r}
-train <- readr::read_csv("train.csv")
-unique_m <- readr::read_csv("unique_m.csv")
+train = read_csv("train.csv")
+unique_m = read_csv("unique_m.csv")
 
-glimpse(train)
-summary(train$critical_temp)
+data = na.omit(train)
 ```
 
-# 3. Exploratory Data Analysis
 
-## 3.1 Target Distribution
 ```{r}
-p1 <- ggplot(train, aes(x = critical_temp)) +
-  geom_histogram(bins = 60, fill = "steelblue") +
-  labs(title = "Histogram of Critical Temperature")
-p2 <- ggplot(train, aes(y = critical_temp)) +
-  geom_boxplot(fill = "tomato") +
-  labs(title = "Boxplot of Critical Temperature")
-grid.arrange(p1, p2, ncol = 2)
+X = as.matrix(data[, -which(names(data) == "critical_temp")])
+y = data$critical_temp
+X_scaled = scale(X)
 ```
 
-Q-Q Plot:
-```{r}
-qq_df <- data.frame(
-  theor = qqnorm(train$critical_temp, plot.it = FALSE)$x,
-  sample = sort(train$critical_temp)
-)
-ggplot(qq_df, aes(theor, sample)) +
-  geom_point(alpha = 0.4) +
-  geom_abline(linetype = 2) +
-  labs(title = "Q-Q Plot of Critical Temp")
+## visualizing TC
+
+
+```{r histogram-critical-temp}
+ggplot(data, aes(x = critical_temp)) +
+  geom_histogram(binwidth = 5, fill = "lightblue", color = "black", alpha = 0.75) +
+  labs(title = "Distribution of Critical Temperature ",
+       x = "Critical Temperature",
+       y = "Count") +
+  theme_minimal()
 ```
 
-## 3.2 Correlation with Target
+## Summary of Temp
+
 ```{r}
-X <- train %>% dplyr::select(-critical_temp)
-y <- train$critical_temp
+summary_stats = data %>%
+  summarise(
+    Min = min(critical_temp, na.rm = TRUE),
+    `1st Qu.` = quantile(critical_temp, 0.25, na.rm = TRUE),
+    Median = median(critical_temp, na.rm = TRUE),
+    Mean = mean(critical_temp, na.rm = TRUE),
+    `3rd Qu.` = quantile(critical_temp, 0.75, na.rm = TRUE),
+    Max = max(critical_temp, na.rm = TRUE),
+    Std = sd(critical_temp, na.rm = TRUE)
+  )
 
-cors <- purrr::map_dbl(names(X), ~ suppressWarnings(cor(X[[.x]], y)))
-cors_tbl <- tibble(feature = names(X), cor = cors) %>%
-  mutate(abs_cor = abs(cor)) %>%
-  arrange(desc(abs_cor))
+knitr::kable(summary_stats, digits = 4, caption = "Five-Number Summary and Standard Deviation of Critical Temperature")
 
-head(cors_tbl, 15)
 ```
-
-Barplot of top features:
-```{r}
-cors_tbl %>%
-  slice_max(abs_cor, n = 25) %>%
-  mutate(feature = forcats::fct_reorder(feature, abs_cor)) %>%
-  ggplot(aes(feature, abs_cor)) +
-  geom_col(fill = "darkgreen") +
-  coord_flip() +
-  labs(title = "Top 25 Predictors by |Correlation| with Critical Temp",
-       x = NULL, y = "|correlation|")
+```{r coorplot}
+corrplot(cor(X), method = "color", type = "upper", tl.cex = 0.7, number.cex = 0.7, title = "Correlation Predictor variables", mar = c(0,0,1,0))
 ```
+Unreadable... so I will do a top 10 table of correlations
 
-Heatmap of top correlated features:
-```{r}
-top_feats <- cors_tbl %>% slice_max(abs_cor, n = 20) %>% pull(feature)
-corrplot::corrplot(cor(train %>% dplyr::select(dplyr::all_of(top_feats), critical_temp),
-                       use = "pairwise.complete.obs"),
-         type = "upper", order = "hclust")
-```
+```{r multicollinearity}
+# Correlation matrix among predictors
+cormat = cor(X, use = "pairwise.complete.obs")
 
-# 4. Train/Validation Split
-```{r}
-idx <- caret::createDataPartition(train$critical_temp, p = 0.8, list = FALSE)
-training <- train[idx, ]
-testing  <- train[-idx, ]
-```
-
-# 5. Pre-Filtering
-
-## 5.1 Remove Near-Zero Variance
-```{r}
-nzv <- caret::nearZeroVar(training %>% dplyr::select(-critical_temp), saveMetrics = TRUE)
-nzv_drop <- rownames(nzv)[nzv$nzv]
-length(nzv_drop)
-```
-
-## 5.2 Remove Highly Correlated Predictors
-```{r}
-X_train <- training %>% dplyr::select(-critical_temp, -dplyr::all_of(nzv_drop))
-cm <- cor(X_train, use = "pairwise.complete.obs")
-high_corr <- caret::findCorrelation(cm, cutoff = 0.95, names = TRUE, exact = TRUE)
-length(high_corr)
-```
-
-Reduced dataset:
-```{r}
-train_red <- dplyr::bind_cols(X_train %>% dplyr::select(-dplyr::all_of(high_corr)),
-                       critical_temp = training$critical_temp)
-```
-
-# 6. Model Building
-
-## 6.1 Stepwise Selection with BIC
-```{r}
-full_fit <- lm(critical_temp ~ ., data = train_red)
-bic_step <- MASS::stepAIC(full_fit, direction = "both", k = log(nrow(train_red)), trace = FALSE)
-summary(bic_step)
-```
-
-Chosen terms:
-```{r}
-chosen_terms <- names(coef(bic_step))[-1]
-length(chosen_terms)
-head(chosen_terms, 20)
-```
-
-## 6.2 VIF Pruning
-```{r}
-vif_prune <- function(fit, threshold = 10) {
-  repeat {
-    v <- car::vif(fit)
-    if (is.matrix(v)) v <- diag(v)
-    if (length(v) == 0) break
-    v <- sort(v, decreasing = TRUE)
-    if (v[1] > threshold) {
-      worst <- names(v)[1]
-      message("Dropping ", worst, " with VIF=", round(v[1],2))
-      terms_now <- attr(terms(fit), "term.labels")
-      terms_new <- setdiff(terms_now, worst)
-      new_form  <- as.formula(paste("critical_temp ~", paste(terms_new, collapse = " + ")))
-      fit <- lm(new_form, data = model.frame(fit))
-    } else break
-  }
-  fit
+# Function to extract top correlated pairs
+get_top_pairs = function(cmat, n = 10) {
+  m = abs(cmat)
+  m[lower.tri(m, diag = TRUE)] = NA
+  df = as.data.frame(as.table(m))
+  df %>%
+    dplyr::filter(!is.na(Freq)) %>%
+    arrange(desc(Freq)) %>%
+    head(n) %>%
+    rename(var1 = Var1, var2 = Var2, abs_corr = Freq)
 }
 
-final_fit <- vif_prune(bic_step, threshold = 10)
-summary(final_fit)
-```
+# Top 10 correlated predictor pairs
+top_pairs = get_top_pairs(cormat, n = 10)
 
-Final predictors:
-```{r}
-final_terms <- names(coef(final_fit))[-1]
-final_terms
-```
-
-# 7. Diagnostics
-```{r}
-par(mfrow = c(2,2))
-plot(final_fit)
-par(mfrow = c(1,1))
-```
-
-Residual plots:
-```{r}
-broom::augment(final_fit) %>%
-  ggplot(aes(.fitted, .resid)) +
-  geom_point(alpha = 0.3) +
-  geom_hline(yintercept = 0, linetype = 2) +
-  labs(title = "Residuals vs Fitted")
-```
-
-# 8. Performance
-```{r}
-pred_train <- predict(final_fit, newdata = training)
-pred_test  <- predict(final_fit, newdata = testing)
-
-train_metrics <- caret::postResample(pred_train, training$critical_temp)
-test_metrics  <- caret::postResample(pred_test,  testing$critical_temp)
-
-tibble(
-  Split = c("Train","Test"),
-  RMSE  = c(train_metrics["RMSE"], test_metrics["RMSE"]),
-  Rsq   = c(train_metrics["Rsquared"], test_metrics["Rsquared"]),
-  MAE   = c(mean(abs(training$critical_temp - pred_train)),
-            mean(abs(testing$critical_temp  - pred_test)))
+knitr::kable(
+  top_pairs,
+  digits = 3,
+  caption = "Top 10 Most Correlated Predictor Pairs (|r|)"
 )
+
+```
+## LASSO Regression
+
+```{r lasso-regression}
+lasso_cv = cv.glmnet(X_scaled, y, alpha = 1)
+lasso_best_lambda = lasso_cv$lambda.min
+lasso_coef = coef(lasso_cv, s = "lambda.min")
+
+lasso_df = as.data.frame(as.matrix(lasso_coef))
+lasso_df$Feature = rownames(lasso_df)
+colnames(lasso_df)[1] = "Coefficient"
+lasso_df = lasso_df %>% dplyr::filter(Coefficient != 0 & Feature != "(Intercept)")
+lasso_vars = lasso_df$Feature
+lasso_df
 ```
 
-# 9. Conclusion
-- Predictors retained: see `final_terms`.  
-- These are the variables you should use in your linear regression.  
-- Diagnostics show whether assumptions are satisfied.  
-- Performance metrics compare training and test sets.  
+
+---
+
+## Ridge Regression
+
+```{r ridge-regression}
+
+
+ridge_cv = cv.glmnet(X_scaled, y, alpha = 0)
+ridge_best_lambda = ridge_cv$lambda.min
+ridge_coef = coef(ridge_cv, s = "lambda.min")
+
+ridge_df = as.data.frame(as.matrix(ridge_coef))
+ridge_df$Feature = rownames(ridge_df)
+colnames(ridge_df)[1] = "Coefficient"
+
+# Keep only predictors with |coef| >= 0.05
+ridge_filtered = ridge_df %>%
+  dplyr::filter(Feature != "(Intercept)", abs(Coefficient) >= 0.05)
+
+
+ridge_vars = ridge_filtered$Feature
+
+ridge_filtered %>%
+  arrange(desc(abs(Coefficient))) %>%
+  knitr::kable(digits = 4, caption = "Ridge-Selected Features (|Coefficient| ≥ 0.05)")
+
+```
+
+
+---
+
+## Compare Model Accuracy
+
+```{r compare-models-k-fold}
+get_cv_metrics = function(var_names, alpha_val) {
+  df_subset = data %>% dplyr::select(all_of(var_names))
+  X_sub = scale(as.matrix(df_subset))
+  y_sub = data$critical_temp
+  
+  folds = createFolds(y_sub, k = 10)
+  rmse_vals = numeric(10)
+  mae_vals = numeric(10)
+  r2_vals = numeric(10)
+  
+  for (i in 1:10) {
+    test_idx = folds[[i]]
+    train_idx = setdiff(1:nrow(X_sub), test_idx)
+    model_cv = cv.glmnet(X_sub[train_idx, ], y_sub[train_idx], alpha = alpha_val)
+    pred = predict(model_cv, s = "lambda.min", newx = X_sub[test_idx, ])
+    rmse_vals[i] = rmse(y_sub[test_idx], pred)
+    mae_vals[i] = mae(y_sub[test_idx], pred)
+    r2_vals[i] = R2(pred, y_sub[test_idx])
+  }
+  
+  tibble(
+    RMSE = mean(rmse_vals),
+    MAE = mean(mae_vals),
+    R2 = mean(r2_vals)
+  )
+}
+
+lasso_top = get_cv_metrics(lasso_vars, alpha_val = 1)
+ridge_top = get_cv_metrics(ridge_vars, alpha_val = 0)
+
+cv_table = bind_rows(
+  lasso_top %>% mutate(Model = "LASSO (non-zero)"),
+  ridge_top %>% mutate(Model = "Ridge (|coef| ≥ 0.05)")
+) %>%
+  dplyr::select(Model, RMSE, MAE, R2)
+
+knitr::kable(cv_table, digits = 4, caption = "10-Fold Cross-Validation: LASSO vs Ridge")
+```
+
+---
+
+## Feature Counts
+
+```{r feature-counts}
+tibble(
+  Model = c("LASSO", "Ridge"),
+  `# of Selected Features` = c(length(lasso_vars), length(ridge_vars))
+) %>%
+  knitr::kable(caption = "Number of Features Selected by Each Model")
+```
+
+---
+
+## Residual and Prediction Analysis
+
+```{r model-prediction}
+lm_lasso = lm(critical_temp ~ ., data = data %>% dplyr::select(all_of(lasso_vars), critical_temp))
+lm_ridge = lm(critical_temp ~ ., data = data %>% dplyr::select(all_of(ridge_vars), critical_temp))
+
+data$pred_lasso = predict(lm_lasso)
+data$pred_ridge = predict(lm_ridge)
+
+data$resid_lasso = data$critical_temp - data$pred_lasso
+data$resid_ridge = data$critical_temp - data$pred_ridge
+
+blue_trans = adjustcolor("blue", alpha.f = 0.6)
+red_trans = adjustcolor("red", alpha.f = 0.6)
+
+par(mfrow = c(1, 2))
+
+plot(data$critical_temp, data$pred_lasso,
+     main = "LASSO: Actual vs Predicted",
+     xlab = "Actual", ylab = "Predicted", pch = 19, col = blue_trans)
+abline(0, 1, col = "black")
+
+plot(data$critical_temp, data$pred_ridge,
+     main = "Ridge: Actual vs Predicted",
+     xlab = "Actual", ylab = "Predicted", pch = 19, col = red_trans)
+abline(0, 1, col = "black")
+```
+
+---
+
+## Q-Q Plots for Residual Normality
+
+```{r qq-plots}
+par(mfrow = c(1, 2))
+
+qqnorm(data$resid_lasso, main = "Q-Q Plot: LASSO Residuals")
+qqline(data$resid_lasso, col = "red")
+
+qqnorm(data$resid_ridge, main = "Q-Q Plot: Ridge Residuals")
+qqline(data$resid_ridge, col = "red")
+```

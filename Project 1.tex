@@ -13,7 +13,7 @@
     Department of Statistics and Data Science \\
     University of Central Florida \\
     Orlando, United States \\
-    miramirez@knights.ucf.edu}
+    mi723380@ucf.edu}
 }
 
 \begin{document}
@@ -45,7 +45,7 @@ The target variable is the critical temperature ($T_c$) at which the superconduc
 
 Table~\ref{tab:summary} provides the five-number summary and the standard deviation 
 of the critical temperature ($T_c$). As there are 81 predictors in this data set, I could not show a correlation plot to display the multicollinearity.
-So I decided to show the top 10 most correlated pairs in Table~\ref{tab:top_corr}.
+So I decided to show the top 10 most correlated pairs as shown in Table~\ref{tab:top_corr}.
 Figure~\ref{fig:tc_distribution} illustrates the distribution of Critical Temperature ($T_c$). The values indicate that the distribution is 
 right-skewed. The five number summary confirms this as well.
 
@@ -116,32 +116,96 @@ where:
     \item $y_i$ = observed response for sample $i$,
     \item $x_{ij}$ = value of predictor $j$ for sample $i$,
     \item $\beta_j$ = coefficient for predictor $j$,
-    \item $p$ = number of predictors ,
+    \item $p$ = number of predictors,
     \item $\lambda \geq 0$ = regularization parameter controlling penalty strength.
 \end{itemize}
 
-The $L_2$ penalty shrinks coefficients toward zero but does not set them exactly to zero. Which helps mitigate multicollinearity and overfitting.
-
+The $L_2$ penalty shrinks coefficients toward zero but does not set them exactly to zero. This helps mitigate multicollinearity and overfitting.
 
 \subsection{LASSO Regression}
-LASSO (Least Absolute Shrinkage and Selection Operator) introduces an $L_1$ penalty (absolute value of coefficients) instead:
+LASSO (Least Absolute Shrinkage and Selection Operator) uses the same framework as Ridge regression, but it applies an $L_1$ penalty (absolute value of coefficients) instead of $L_2$:
 
 \[
 \min_{\beta} \left\{ \sum_{i=1}^{n} \left(y_i - \beta_0 - \sum_{j=1}^{p} \beta_j x_{ij}\right)^2 
 + \lambda \sum_{j=1}^{p} |\beta_j| \right\}.
 \]
 
-where the terms are defined as above.
+where the terms are the same as above, except:
+\begin{itemize}
+    \item $\sum_{j=1}^{p} |\beta_j|$ = the $L_1$ penalty
+\end{itemize}
 
 The $L_1$ penalty not only shrinks coefficients but can also set some of them exactly to zero. This allows LASSO to perform variable selection automatically, keeping only the most relevant predictors in the model.
 
+\subsection{Model Comparison}
+To evaluate and compare the performance of LASSO and Ridge regression, 
+I used 10-fold cross-validation on the training data. 
+In this setup, the dataset was randomly partitioned into ten equally sized folds. 
 
-\subsection{Model Selection}
-We applied stepwise regression using BIC to reduce the number of predictors.
+The optimal regularization parameter $\lambda$ for both LASSO ($\alpha=1$) 
+and Ridge ($\alpha=0$) regression were chosen automatically by minimizing the 
+cross-validated mean squared error using the \texttt{cv.glmnet} function in R. 
+For Ridge, only predictors with coefficients satisfying $|\beta_j| \geq 0.05$. This was an arbitrary cut off. 
+I tried .01 as the cut off and It kept all 81 predictors.
 
-lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+Table~\ref{tab:cv_compare} reports the averaged metrics over all folds, 
+allowing us to directly compare the predictive accuracy of the two models.
+
+\begin{table}[htbp]
+\centering
+\caption{10-Fold Cross-Validation: LASSO vs Ridge}
+\label{tab:cv_compare}
+\begin{tabular}{lccc}
+\toprule
+Model & RMSE & MAE & $R^2$ \\
+\midrule
+LASSO  & 17.6705 & 13.3733 & 0.7340 \\
+Ridge ($\geq$ 0.05) & 18.9524 & 14.6088 & 0.6951 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{predict_residuals.png}
+    \caption{Actual vs Predicted critical temperature ($T_c$) for LASSO and Ridge. 
+    The 45-degree line represents perfect prediction.}
+    \label{fig:actual_vs_pred}
+\end{figure}
+
+Figure~\ref{fig:actual_vs_pred} shows the predicted versus actual critical temperatures. 
+The graphs are similar for both models. Which The RMSE, MAE and $R^2$ values in Table~\ref{tab:cv_compare} confirm.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\linewidth]{qq_plots.png}
+    \caption{Q--Q plots of residuals for LASSO (left) and Ridge (right). 
+    Deviations from the red line indicate departures from normality.}
+    \label{fig:qqplots}
+\end{figure}
+
+Figure~\ref{fig:qqplots} shows the Q–Q plots for residuals. Both LASSO and Ridge display deviations from the reference line in the tails, suggesting that residuals are not normally distributed.
 \section{Conclusion}
-lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+In this project I compared LASSO and Ridge regression for predicting the 
+critical temperature ($T_c$) of superconductors. Since the dataset contains 81 
+predictors that showed multicollinearity, a regularized approach was needed 
+instead of ordinary least squares. 
+
+The results from 10-fold cross-validation showed that LASSO gave better 
+predictions than Ridge, with lower error and higher $R^2$. But only slightly. 
+Lasso ended up using 78 predictors and Ridge used 78 predictors as well. 
+
+If I were to improve on this project, 
+I would consider trying an elastic net approach, which blends LASSO and Ridge. 
+Or try different models such as Random Forest or Gradient Boosting Machines.
+
+\appendix
+
+
+\section{R Code}
+\url{https://github.com/MiguelARam27/data-mining-project-1}
+
 \begin{thebibliography}{00}
 
 \bibitem{sciencedirect_tc}
